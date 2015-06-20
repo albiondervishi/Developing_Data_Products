@@ -1,0 +1,110 @@
+ICU Vital Status Prediction
+========================================================
+author: S. Yu
+date: `r date()`
+transition: rotate
+
+Introduction
+========================================================
+<small>This is a study in an ICU dataset from the book 
+'Applied Logistic Regression, 3rd Ed., by Hosmer, 
+Lemeshow and Sturdivant'. The ICU dataset 
+consists of a sample of 200 subjects who were part of 
+a much larger study on survival of patients following 
+admission to an adult intensive care unit (ICU). The 
+major goal of this study was to develop a logistic 
+regression model to predict the probability of survival 
+to hospital discharge of these patients. A number of 
+publications have appeared which have focused on various
+facets of this problem.
+
+Due to the limit of number of slides allowed, this 
+presentation only shows the brief steps that we use to
+develop the model that will later be used for the 
+prediction algorithm of a Shiny application.
+
+This is also a simplified model development as we do not 
+use the more sophisticated techniques, such as cross validation
+or principal components analysis (PCA).
+</small>
+
+Data Structure of ICU Dataset
+========================================================
+<small><small>**ID** - Identification code (ID Number)  
+**STA** - Vital Status at hospital discharge (0: Lived, 1: Died)  
+**AGE** - Age (Years)  
+**SEX** - Gender (0: Male, 1: Female)  
+**RACE** -Race (0: White, 1: Black, 2: Other)  
+**SER** - Service at ICU admission (0: Medical, 1: Surgical)  
+**CAN** - Cancer part of present problem (0: No, 1: Yes)  
+**CRN** - History of chronic renal failure (0: No, 1: Yes)  
+**INF** - Infection probable at ICU admission (0 No, 1: Yes)  
+**CPR** - CPR prior to ICU admission (0: No, 1: Yes)  
+**SYS** - Systolic blood pressure at ICU admission (mm Hg)  
+**HRA** - Heart rate at ICU admission (Beats/min)  
+**PRE** - Previous admission to an ICU within 6 months (0: No, 1: Yes)  
+**TYP** - Type of admission (0: Elective, 1: Emergency)  
+**FRA** - Long bone, multiple, neck, single area, or hip fracture (0: No, 1: Yes)  
+**PO2** - PO2 from initial blood gases (0: > 60, 1: <= 60)  
+**PH**  - PH from initial blood gases (0: >= 7.25, 1: < 7.25)  
+**PCO** - PCO2 from initial blood gases (0: <= 45, 1: > 45)  
+**BIC** - Bicarbonate from initial blood gases (0: >= 18, 1: < 18)  
+**CRE** - Creatinine from initial blood gases (0: <= 2.0, 1: > 2.0)  
+**LOC** - Level of consciousness at ICU admission (0: No coma or DS, 1: Deep stupor, 2: Coma)</small></small>
+
+Model Training using Logistic Regression
+========================================================
+
+```{r ,echo=FALSE}
+library(lattice)
+library(ggplot2)
+library(caret)
+## specify the column types
+classes <- c("integer","factor","integer",rep("factor",7), rep("integer",2), rep("factor",9))
+## import the data
+data <- read.csv("icu.csv", colClasses = classes)
+## remove the first ID column
+data <- data[,-1]
+set.seed(2046)
+## partition the original dataset into a training set (80%) and a validation set (20%)
+inTrain <- createDataPartition(y=data$STA, p=.8, list=FALSE)
+training <- data[inTrain,]
+validation <- data[-inTrain,]
+## function to get validation accuracy
+getAccuracy <- function (modelFit) {
+    pred <- predict(modelFit, validation, type="response")
+    pred_LR <- rep("0", length(pred))
+    pred_LR[pred > 0.5] = "1"
+    matrix <- confusionMatrix(validation$STA, pred_LR)
+    accuracy <- as.numeric(matrix$overall["Accuracy"]) * 100
+}
+
+```
+<small>
+```{r}
+## initial model training with all variables
+modFit_LR <- glm(STA ~ ., family=binomial, data=training);
+accuracy <- getAccuracy(modFit_LR)
+```
+
+The validation step shows that the accuracy of the initial model with all variables available in the dataset is:  **`r accuracy` %**  
+
+And the summary of the model shows that only some variables are statistically significant to the output variable STA. They are **_AGE, CAN, SYS, PRE, TYP, PH, PCO_** and **_LOC_**.
+
+Because of that, we develop a new model using only those eight variables.  
+
+```{r}
+## get a new model with only eight variables
+modFit_LR <- glm(STA ~ AGE+CAN+SYS+PRE+TYP+PH+PCO+LOC, family=binomial, data=training)
+accuracy <- getAccuracy(modFit_LR)
+```
+</small>
+
+
+Conclusion
+========================================================
+<small>
+The prediction accuracy of the final model has increased to **`r accuracy` %**. 
+Based on this improved accuracy, we adopt this model as the final algorithm of the Shiny application as below.  
+</small>  
+![alt text](ShinyApp.png)
